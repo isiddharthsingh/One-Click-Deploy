@@ -217,7 +217,7 @@ async function testArvoApp() {
 async function demo() {
   console.log('🌟 Arvo Hello World - Production Deployment Test');
   console.log('================================================');
-  console.log('Repository: https://github.com/Arvo-AI/hello_world');
+  console.log('Repository: https://github.com/stknohg/app-runner-flask-sample.git');
   console.log('App Type: Flask with Frontend + Backend');
   console.log('');
 
