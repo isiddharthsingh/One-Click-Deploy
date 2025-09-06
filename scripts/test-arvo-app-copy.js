@@ -76,7 +76,7 @@ async function makeRequest(method, path, data = null) {
 }
 
 async function testArvoApp() {
-  console.log('🎯 Testing Arvo Hello World Flask App');
+  console.log('🎯 Testing deployment of app-runner-flask-sample');
   console.log('====================================');
   
   const isProductionMode = process.env.USE_REAL_TERRAFORM === 'true';
