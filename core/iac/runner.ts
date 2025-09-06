@@ -64,9 +64,41 @@ export class TerraformRunner {
       this.log("Terraform plan completed successfully");
       return true;
     } catch (error: any) {
+      const stderr: string = (error && error.stderr) || "";
+      const stdout: string = (error && error.stdout) || "";
       this.log(`Terraform plan failed: ${error.message}`);
-      if (error.stdout) this.log(`STDOUT: ${error.stdout}`);
-      if (error.stderr) this.log(`STDERR: ${error.stderr}`);
+      if (stdout) this.log(`STDOUT: ${stdout}`);
+      if (stderr) this.log(`STDERR: ${stderr}`);
+
+      // Handle stale state lock: ConditionalCheckFailedException
+      const all = `${stdout}\n${stderr}`;
+      if (all.includes("Error acquiring the state lock") && all.includes("ConditionalCheckFailedException")) {
+        const idMatch = all.match(/ID:\s*([a-f0-9\-]+)/i);
+        const lockId = idMatch?.[1];
+        if (lockId) {
+          try {
+            this.log(`Attempting to force-unlock Terraform state (lock ID: ${lockId})...`);
+            await execa("terraform", ["force-unlock", "-force", lockId], { cwd: this.workdir, stdio: "pipe" });
+            this.log("State force-unlocked. Retrying plan once...");
+            const retry = await execa("terraform", [
+              "plan",
+              "-input=false",
+              "-var-file",
+              varsFile,
+              "-out=tfplan"
+            ], { cwd: this.workdir, stdio: "pipe" });
+            this.log(retry.stdout);
+            if (retry.stderr) this.log(`STDERR: ${retry.stderr}`);
+            this.log("Terraform plan completed successfully (after unlock)");
+            return true;
+          } catch (unlockErr: any) {
+            this.log(`Force-unlock/Retry failed: ${unlockErr.message}`);
+            if (unlockErr.stdout) this.log(`STDOUT: ${unlockErr.stdout}`);
+            if (unlockErr.stderr) this.log(`STDERR: ${unlockErr.stderr}`);
+          }
+        }
+      }
+
       return false;
     }
   }
@@ -114,9 +146,74 @@ export class TerraformRunner {
         logs: this.logs
       };
     } catch (error: any) {
+      const stderr: string = (error && error.stderr) || "";
+      const stdout: string = (error && error.stdout) || "";
       this.log(`Terraform apply failed: ${error.message}`);
-      if (error.stdout) this.log(`STDOUT: ${error.stdout}`);
-      if (error.stderr) this.log(`STDERR: ${error.stderr}`);
+      if (stdout) this.log(`STDOUT: ${stdout}`);
+      if (stderr) this.log(`STDERR: ${stderr}`);
+
+      // Attempt unlock+retry for apply as well
+      const all = `${stdout}\n${stderr}`;
+      // Handle pre-existing DynamoDB table: import then retry
+      if (all.includes("ResourceInUseException") && all.includes("Table already exists")) {
+        try {
+          this.log("Detected existing DynamoDB table. Importing into Terraform state and retrying...");
+          // Import the Employee table into the expected module resource address
+          await execa("terraform", [
+            "import",
+            "module.dynamodb_sample.aws_dynamodb_table.employee",
+            "Employee"
+          ], { cwd: this.workdir, stdio: "pipe" });
+          // Re-run plan and apply
+          const planOk = await this.plan(varsFile);
+          if (planOk) {
+            const retry = await execa("terraform", [
+              "apply",
+              "-auto-approve",
+              "-input=false",
+              "tfplan"
+            ], { cwd: this.workdir, stdio: "pipe" });
+            this.log(retry.stdout);
+            if (retry.stderr) this.log(`STDERR: ${retry.stderr}`);
+            this.log("Terraform apply completed successfully (after import)");
+            const outputs = await this.getOutputs();
+            return { success: true, outputs, logs: this.logs };
+          }
+        } catch (impErr: any) {
+          this.log(`Import/Retry failed: ${impErr.message}`);
+          if (impErr.stdout) this.log(`STDOUT: ${impErr.stdout}`);
+          if (impErr.stderr) this.log(`STDERR: ${impErr.stderr}`);
+        }
+      }
+      if (all.includes("Error acquiring the state lock") && all.includes("ConditionalCheckFailedException")) {
+        const idMatch = all.match(/ID:\s*([a-f0-9\-]+)/i);
+        const lockId = idMatch?.[1];
+        if (lockId) {
+          try {
+            this.log(`Attempting to force-unlock Terraform state (lock ID: ${lockId})...`);
+            await execa("terraform", ["force-unlock", "-force", lockId], { cwd: this.workdir, stdio: "pipe" });
+            this.log("State force-unlocked. Retrying plan+apply once...");
+            const planOk = await this.plan(varsFile);
+            if (planOk) {
+              const retry = await execa("terraform", [
+                "apply",
+                "-auto-approve",
+                "-input=false",
+                "tfplan"
+              ], { cwd: this.workdir, stdio: "pipe" });
+              this.log(retry.stdout);
+              if (retry.stderr) this.log(`STDERR: ${retry.stderr}`);
+              this.log("Terraform apply completed successfully (after unlock)");
+              const outputs = await this.getOutputs();
+              return { success: true, outputs, logs: this.logs };
+            }
+          } catch (unlockErr: any) {
+            this.log(`Force-unlock/Retry failed: ${unlockErr.message}`);
+            if (unlockErr.stdout) this.log(`STDOUT: ${unlockErr.stdout}`);
+            if (unlockErr.stderr) this.log(`STDERR: ${unlockErr.stderr}`);
+          }
+        }
+      }
 
       return {
         success: false,

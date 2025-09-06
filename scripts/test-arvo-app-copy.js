@@ -99,8 +99,8 @@ async function testArvoApp() {
     // Deploy the Arvo app
     console.log('\n🚀 Deploying Arvo Hello World App');
     const deploymentRequest = {
-      description: "Deploy this Flask app in us-east-2",
-      repo: "https://github.com/isiddharthsingh/Flash-Hello-World.git",
+      description: "Deploy this Flask app in us-east-2 using ecs fargate",
+      repo: "https://github.com/stknohg/app-runner-flask-sample.git",
       branch: "main"
     };
     

@@ -6,9 +6,9 @@ export function analyzeRepo(repoPath: string): RepoFacts {
   const apps: RepoApp[] = [];
   const has = (filePath: string) => fs.existsSync(path.join(repoPath, filePath));
   
-  // Detect monorepo structure
+  // Detect monorepo structure (do NOT treat a lone "app" folder as a monorepo)
   const isMonorepo = has("frontend") || has("backend") || has("packages") || 
-                     has("apps") || (has("client") && has("server")) || has("app");
+                     has("apps") || (has("client") && has("server"));
   
   if (isMonorepo) {
     // Analyze subdirectories for monorepo
@@ -33,12 +33,18 @@ export function analyzeRepo(repoPath: string): RepoFacts {
       }
     }
   } else {
-    // Single app repo
-    const singleApps = analyzeDirectory(repoPath, ".");
-    apps.push(...singleApps);
+    // Single app repo; if an "app" subdir exists, analyze it, otherwise analyze root
+    if (has("app")) {
+      const subApps = analyzeDirectory(path.join(repoPath, "app"), "app");
+      apps.push(...subApps);
+    } else {
+      const singleApps = analyzeDirectory(repoPath, ".");
+      apps.push(...singleApps);
+    }
   }
   
-  return { apps, monorepo: isMonorepo };
+  const isMonorepoFinal = apps.length > 1;
+  return { apps, monorepo: isMonorepoFinal };
 }
 
 function analyzeDirectory(dirPath: string, relativePath: string): RepoApp[] {

@@ -133,7 +133,8 @@ export class DeploymentPipeline {
             const buildResult = await buildApplication(app || ({} as any), plan, {
               repoPath: appPath,
               imageName: localImageName,
-              registryUrl
+              registryUrl,
+              tag: this.runId
             });
 
             if (!buildResult.success) {

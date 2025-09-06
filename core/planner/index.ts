@@ -70,6 +70,11 @@ export function createPlan(deploySpec: DeploySpec, repoFacts: RepoFacts): Plan {
     }
   }
 
+  // Strong preference: if a relational database is required, use ECS Fargate for VPC connectivity
+  if (needsDb && plan.runtime === "apprunner") {
+    plan.runtime = "ecs_fargate";
+  }
+
   // Set domain if specified
   if (deploySpec.domain) {
     plan.network.host = deploySpec.domain;

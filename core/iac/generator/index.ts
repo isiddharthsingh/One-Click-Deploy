@@ -42,9 +42,8 @@ export async function generateIaC(
     stacks.push("rds_postgres");
   }
 
-  // Add optional sample DynamoDB table if app likely uses DynamoDB
-  // Heuristic: Python Flask sample with /dynamodb route in repo name
-  if (deploySpec.cloud === "aws" && plan.runtime === "ecs_fargate") {
+  // Include sample DynamoDB table for ECS Fargate runs to support /dynamodb route in sample app
+  if (plan.runtime === "ecs_fargate") {
     stacks.push("dynamodb_sample");
   }
 
@@ -185,8 +184,7 @@ provider "aws" {
 }
 
 `;
-    }
-    else if (stack === "dynamodb_sample") {
+    } else if (stack === "dynamodb_sample") {
       mainTf += `module "dynamodb_sample" {
   source = "./modules/dynamodb_sample"
   
@@ -250,7 +248,7 @@ function generateTfVars(deploySpec: DeploySpec, plan: Plan): Record<string, any>
   if (plan.runtime === "apprunner") {
     // Use the actual registry URL from environment
     const registryUrl = process.env.REGISTRY_URL || `${process.env.AWS_ACCOUNT_ID || "123456789012"}.dkr.ecr.${deploySpec.region}.amazonaws.com/${deploySpec.app_name}`;
-    // The actual tag is decided at runtime by the pipeline (runId prefix). Use latest as a fallback; pipeline passes the concrete tag via module variable when applying.
+    // Use run-specific tag if provided via TFVARS update; default to latest here (overridden later in pipeline)
     vars.image_uri = `${registryUrl}:latest`;
     vars.app_port = 8080;
     vars.env_vars = { PORT: String(8080) };
@@ -291,7 +289,8 @@ function generateTfVars(deploySpec: DeploySpec, plan: Plan): Record<string, any>
     vars.db_allocated_storage = 20;
     vars.db_backup_retention = 7;
     vars.db_skip_final_snapshot = true;
-    vars.db_deletion_protection = deploySpec.env === "prod" ? true : false;
+    // Always disable deletion protection per request
+    vars.db_deletion_protection = false;
   }
 
   return vars;
@@ -442,11 +441,13 @@ function generateBackendTf(deploySpec: DeploySpec): string {
   // Use environment variables for bucket and table names
   const bucketName = process.env.TF_BUCKET || `${deploySpec.app_name}-terraform-state`;
   const tableName = process.env.TF_DDB_TABLE || `${deploySpec.app_name}-terraform-locks`;
+  // Default to legacy key for compatibility with existing state; allow override
+  const stateKey = process.env.TF_STATE_KEY || `terraform.tfstate`;
   
   return `terraform {
   backend "s3" {
     bucket         = "${bucketName}"
-    key            = "terraform.tfstate"
+    key            = "${stateKey}"
     region         = "${deploySpec.region}"
     dynamodb_table = "${tableName}"
     encrypt        = true

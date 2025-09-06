@@ -10,7 +10,8 @@ terraform {
 
 # IAM role for App Runner service
 resource "aws_iam_role" "apprunner_service_role" {
-  name = "${var.service_name}-apprunner-service-role"
+  # Use unique name to avoid EntityAlreadyExists when re-running
+  name = "${var.service_name}-apprunner-service-role-${random_string.suffix.id}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -47,7 +48,7 @@ resource "aws_apprunner_service" "app" {
         runtime_environment_variables = var.env_vars
       }
     }
-    auto_deployments_enabled = false
+    auto_deployments_enabled = true
   }
 
   instance_configuration {
@@ -70,7 +71,8 @@ resource "aws_apprunner_service" "app" {
 
 # IAM role for App Runner instance
 resource "aws_iam_role" "apprunner_instance_role" {
-  name = "${var.service_name}-apprunner-instance-role"
+  # Use unique name to avoid EntityAlreadyExists when re-running
+  name = "${var.service_name}-apprunner-instance-role-${random_string.suffix.id}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -84,4 +86,10 @@ resource "aws_iam_role" "apprunner_instance_role" {
       }
     ]
   })
+}
+
+resource "random_string" "suffix" {
+  length  = 6
+  upper   = false
+  special = false
 }

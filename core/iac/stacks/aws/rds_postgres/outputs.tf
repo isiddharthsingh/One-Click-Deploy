@@ -1,6 +1,7 @@
 output "database_url" {
   description = "PostgreSQL connection URL"
-  value       = "postgresql://${aws_db_instance.postgres.username}:${random_password.db_password.result}@${aws_db_instance.postgres.endpoint}/${aws_db_instance.postgres.db_name}"
+  # URL-encode credentials to avoid invalid DSN due to special characters
+  value       = "postgresql://${urlencode(aws_db_instance.postgres.username)}:${urlencode(random_password.db_password.result)}@${aws_db_instance.postgres.endpoint}/${aws_db_instance.postgres.db_name}"
   sensitive   = true
 }
 
