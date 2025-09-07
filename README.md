@@ -6,13 +6,16 @@ Turn a short request and a repo link into a running app on cloud.
 
 - **Natural Language Input**: Describe what you want to deploy in plain English
 - **Multi-Framework Support**: Flask, Django, Express, Next.js, React, static sites
-- **Smart Infrastructure**: Automatically picks the right AWS services (App Runner, ECS, S3+CloudFront)
+- **Smart Infrastructure**: Automatically picks the right AWS services (App Runner, ECS Fargate + ALB, S3+CloudFront, RDS Postgres)
 - **One-Click Deploy**: From repo to live URL with full pipeline automation
 - **Comprehensive Logging**: Track every step with structured logs
+- **Production Deployments**: Real AWS provisioning via Terraform
+- **Container Build & Push**: Docker/Buildpacks with ECR login and linux/amd64 platform
+- **Resilient Terraform Runner**: Auto force-unlock state and import existing resources when safe
 
 ## Quick Start
 
-### MVP Mode (Simulated Deployments)
+### Local Development
 
 1. **Install dependencies:**
 ```bash
@@ -29,13 +32,9 @@ npm run build
 npm run dev
 ```
 
-4. **Run the demo:**
-```bash
-# In another terminal
-node scripts/demo.js
-```
 
-### Production Mode (Real AWS Deployments)
+
+### Production Deployments (Real AWS)
 
 1. **Prerequisites:**
    - AWS CLI installed and configured
@@ -58,9 +57,13 @@ source .env
 npm run dev
 ```
 
-5. **Run production deployment:**
+5. **Run a production deployment:**
 ```bash
-node scripts/demo-production.js
+# Deploy a real Flask sample app to AWS
+node scripts/test-arvo-app.js
+
+# Deploy an alternate repo
+node scripts/test-arvo-app-copy.js
 ```
 
 ## API Usage
@@ -148,7 +151,11 @@ The planner automatically chooses the best AWS services:
 - **RDS Postgres** when database is detected
 - Custom networking and routing
 
-## Environment Variables (Optional)
+Notes:
+- Simple single-service apps favor App Runner. Explicit multi-service/DB requirements favor ECS Fargate + ALB and RDS.
+- Flask ports (5000/8080) and health checks are auto-configured.
+
+## Environment Variables
 
 For production deployments, configure:
 
@@ -158,13 +165,14 @@ export TF_BUCKET=your-terraform-state-bucket
 export TF_DDB_TABLE=your-terraform-lock-table
 export REGISTRY_URL=your-ecr-registry-url
 export WORK_ROOT=/tmp/auto-deploy-runs
+export USE_REAL_TERRAFORM=true
 ```
 
 ## Project Structure
 
 ```
 auto-deploy/
-├── apps/api/                 # FastAPI server
+├── apps/api/                 # Fastify server
 ├── core/
 │   ├── parser/              # Natural language parser
 │   ├── analyzer/            # Repository analyzer
@@ -184,37 +192,27 @@ auto-deploy/
 - `npm run build` - Build TypeScript to JavaScript
 - `npm run start` - Start production server
 - `npm run lint` - Lint code with ESLint
-- `node scripts/demo.js` - Run interactive demo
+- `node scripts/test-arvo-app.js` - Run production test deployment
+- `node scripts/test-arvo-app-copy.js` - Run alternate production test
 
-## Current Status (MVP)
+## Validated Examples
 
-✅ **Completed Features:**
-- Natural language parsing with rule-based system
-- Repository analysis for major frameworks
-- Intelligent runtime planning
-- Complete Terraform stack generation
-- Build system architecture (Docker + Buildpacks)
-- Full API with logging and status tracking
-- End-to-end pipeline orchestration
+Successfully deployed end-to-end to AWS:
 
-🚧 **MVP Limitations:**
-- Simulated deployments (no actual AWS provisioning)
-- In-memory storage (no persistence)
-- Basic error handling
-- No authentication/authorization
+- https://github.com/stknohg/app-runner-flask-sample.git
+- https://github.com/isiddharthsingh/Flash-Hello-World.git
 
-## Next Steps for Production
+## Cost and Cleanup
 
-1. **AWS Integration** - Connect to real AWS services
-2. **Persistence** - Add database for run history
-3. **Authentication** - Add user management
-4. **UI Dashboard** - Web interface for deployments
-5. **Advanced Features** - Custom domains, environment management
-6. **Monitoring** - Application health monitoring
+- App Runner: ~ $0.064/hour + requests
+- ECR: ~$0.10/GB/month; S3 and DynamoDB minimal
+
+Cleanup:
+- Delete resources via AWS Console, or run Terraform destroy from generated workdir.
 
 ## Contributing
 
-This is an MVP implementation. The architecture is designed for extensibility:
+The architecture is designed for extensibility:
 
 - Add new framework detectors in `core/analyzer/`
 - Add new cloud providers in `core/iac/stacks/`
