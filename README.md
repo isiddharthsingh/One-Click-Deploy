@@ -13,6 +13,9 @@ Turn a short request and a repo link into a running app on cloud.
 - **Container Build & Push**: Docker/Buildpacks with ECR login and linux/amd64 platform
 - **Resilient Terraform Runner**: Auto force-unlock state and import existing resources when safe
 
+- **Auto Dockerfile Handling**: Uses an existing `Dockerfile` if present to build the image and proceed directly to deployment.
+- **Dockerfile Generation**: If no `Dockerfile` is found, generates one based on the framework and builds the image automatically (ports and health checks inferred from the repo).
+
 ## Quick Start
 
 ### Local Development
@@ -116,6 +119,10 @@ The system follows a comprehensive pipeline:
 6. **Deployer** - Provisions infrastructure and deploys applications
 7. **Verifier** - Checks health and provides deployment status
 
+Builder behavior:
+- If the repository contains a `Dockerfile`, the system builds the image directly from it and continues to deployment.
+- If no `Dockerfile` exists, the system generates an opinionated `Dockerfile` tailored to the detected framework (e.g., Flask/Gunicorn, Node/Express), infers ports and start commands, builds the image, and proceeds to deployment.
+
 ## Supported Frameworks
 
 ### Python
@@ -153,7 +160,7 @@ The planner automatically chooses the best AWS services:
 
 Notes:
 - Simple single-service apps favor App Runner. Explicit multi-service/DB requirements favor ECS Fargate + ALB and RDS.
-- Flask ports (5000/8080) and health checks are auto-configured.
+- Ports and health checks are auto-detected from the repo (e.g., Flask 5000/8080), and passed through to the runtime and health checks (ALB/App Runner).
 
 ## Environment Variables
 
